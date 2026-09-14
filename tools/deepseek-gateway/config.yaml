@@ -1,0 +1,32 @@
+# LiteLLM 프록시 설정: Claude 데스크톱 앱(서드파티 모드) -> DeepSeek
+#
+# 앱이 요구하는 것:
+#   1. claude-* 형식의 모델 이름  (모델 ID 검증 통과용)
+#   2. GET /v1/models 응답        (연결 테스트용, DeepSeek 직접 연결로는 404)
+# 아래 model_name 이 앱에 보이는 이름, litellm_params.model 이 실제 호출 대상입니다.
+#
+# 실제 DeepSeek 모델 ID가 다르면 litellm_params.model 의 "deepseek/" 뒤쪽만 고치세요.
+# (platform.deepseek.com 모델 목록 기준)
+
+model_list:
+  - model_name: claude-opus-4-1
+    litellm_params:
+      model: deepseek/deepseek-v4-pro
+      api_key: os.environ/DEEPSEEK_API_KEY
+
+  - model_name: claude-sonnet-4-5
+    litellm_params:
+      model: deepseek/deepseek-v4-pro
+      api_key: os.environ/DEEPSEEK_API_KEY
+
+  - model_name: claude-haiku-4-5
+    litellm_params:
+      model: deepseek/deepseek-flash
+      api_key: os.environ/DEEPSEEK_API_KEY
+
+litellm_settings:
+  drop_params: true          # DeepSeek 가 모르는 파라미터는 버리고 전달
+  request_timeout: 600
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
