@@ -117,6 +117,11 @@ def index():
     return FileResponse(STATIC_DIR / "index.html")
 
 
+@app.get("/icon.png")
+def icon():
+    return FileResponse(STATIC_DIR / "icon.png")
+
+
 @app.post("/api/translate")
 def translate(file: UploadFile = File(...)):
     workdir = tempfile.mkdtemp(prefix="vt_")

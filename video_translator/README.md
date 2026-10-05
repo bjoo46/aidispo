@@ -8,7 +8,14 @@
 
 결과는 영상 위에 한국어 자막으로 표시되고, 줄을 클릭하면 해당 위치로 이동합니다. SRT 파일로 내려받거나 텍스트로 복사할 수 있습니다.
 
-## 실행
+## 바탕화면 바로가기 (Windows)
+
+1. [Python](https://www.python.org/downloads/)과 ffmpeg(`winget install Gyan.FFmpeg`)를 설치합니다.
+2. 이 폴더의 `create_shortcut.bat`을 더블클릭하면 바탕화면에 아이콘이 붙은 **대사 번역기** 바로가기가 생깁니다.
+3. 바로가기를 더블클릭하면 서버가 켜지고 브라우저가 열립니다. 처음 한 번만 API 키를 물어보고 저장합니다. 필요한 패키지도 처음에 자동으로 설치합니다.
+4. 끄려면 검은 서버 창을 닫습니다.
+
+## 직접 실행
 
 ```bash
 # ffmpeg 필요 (macOS: brew install ffmpeg / Ubuntu: apt install ffmpeg)
