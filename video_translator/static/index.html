@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>대사 번역기</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --panel: #ffffff; --text: #1b1f24; --muted: #6b7280;
+    --border: #e2e5ea; --accent: #3b5bdb; --accent-soft: #e7ecff; --error: #c92a2a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #121417; --panel: #1b1e23; --text: #e6e8eb; --muted: #9aa1ab;
+      --border: #2c3138; --accent: #748ffc; --accent-soft: #232a45; --error: #ff8787;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; }
+  main { max-width: 960px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 24px; }
+
+  #drop { border: 2px dashed var(--border); border-radius: 14px; background: var(--panel);
+          padding: 48px 16px; text-align: center; cursor: pointer; transition: .15s; }
+  #drop.over { border-color: var(--accent); background: var(--accent-soft); }
+  #drop strong { display: block; font-size: 17px; margin-bottom: 4px; }
+  #drop span { color: var(--muted); font-size: 14px; }
+
+  #status { margin: 20px 0; display: none; align-items: center; gap: 12px; }
+  #status.show { display: flex; }
+  .spinner { width: 18px; height: 18px; border: 2px solid var(--border); border-top-color: var(--accent);
+             border-radius: 50%; animation: spin .8s linear infinite; flex: none; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .steps { display: flex; gap: 8px; flex-wrap: wrap; font-size: 13px; }
+  .step { padding: 2px 10px; border-radius: 99px; border: 1px solid var(--border); color: var(--muted); }
+  .step.active { border-color: var(--accent); color: var(--accent); }
+  .step.done { background: var(--accent-soft); border-color: transparent; color: var(--accent); }
+  #msg { color: var(--muted); font-size: 14px; }
+  #error { color: var(--error); margin: 16px 0; display: none; }
+
+  #result { display: none; margin-top: 24px; }
+  video { width: 100%; max-height: 420px; background: #000; border-radius: 12px; }
+  video::cue { font-size: 1.1em; background: rgba(0,0,0,.7); }
+  .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 16px 0 8px; }
+  .toolbar .info { color: var(--muted); font-size: 13px; margin-right: auto; }
+  button, label.chk { font: inherit; font-size: 13px; border: 1px solid var(--border); background: var(--panel);
+           color: var(--text); padding: 6px 12px; border-radius: 8px; cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  label.chk { display: inline-flex; gap: 6px; align-items: center; }
+
+  ol#lines { list-style: none; margin: 0; padding: 0; background: var(--panel);
+             border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  #lines li { display: grid; grid-template-columns: 64px 1fr; gap: 12px; padding: 10px 14px;
+              border-top: 1px solid var(--border); cursor: pointer; }
+  #lines li:first-child { border-top: none; }
+  #lines li:hover { background: var(--accent-soft); }
+  #lines li.current { background: var(--accent-soft); }
+  #lines li.nondialogue { opacity: .45; }
+  .ts { font-variant-numeric: tabular-nums; color: var(--accent); font-size: 13px; padding-top: 2px; }
+  .ko { font-size: 16px; }
+  .orig { color: var(--muted); font-size: 13px; }
+  .empty { padding: 24px; text-align: center; color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <h1>동영상 대사 → 한국어 번역</h1>
+  <p class="sub">동영상을 끌어다 놓으면 소리만 추출해 대사를 인식하고 한국어로 번역합니다.</p>
+
+  <div id="drop">
+    <strong>여기에 동영상을 드래그하세요</strong>
+    <span>또는 클릭해서 파일 선택 · mp4, mov, mkv, webm 등</span>
+    <input id="file" type="file" accept="video/*,audio/*" hidden>
+  </div>
+
+  <div id="status">
+    <div class="spinner"></div>
+    <div>
+      <div class="steps">
+        <span class="step" data-step="upload">업로드</span>
+        <span class="step" data-step="audio">오디오 추출</span>
+        <span class="step" data-step="transcribe">음성 인식</span>
+        <span class="step" data-step="translate">번역</span>
+      </div>
+      <div id="msg"></div>
+    </div>
+  </div>
+  <div id="error"></div>
+
+  <section id="result">
+    <video id="video" controls></video>
+    <div class="toolbar">
+      <span class="info" id="info"></span>
+      <label class="chk"><input type="checkbox" id="showAll"> 비대사 포함</label>
+      <label class="chk"><input type="checkbox" id="showOrig" checked> 원문 표시</label>
+      <button id="dlSrt">SRT 다운로드</button>
+      <button id="dlTxt">텍스트 복사</button>
+    </div>
+    <ol id="lines"></ol>
+  </section>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const drop = $("drop"), fileInput = $("file"), video = $("video");
+const STEPS = ["upload", "audio", "transcribe", "translate"];
+let segments = [], videoUrl = null, fileName = "video";
+
+drop.addEventListener("click", () => fileInput.click());
+fileInput.addEventListener("change", () => fileInput.files[0] && start(fileInput.files[0]));
+["dragenter", "dragover"].forEach(e => drop.addEventListener(e, ev => { ev.preventDefault(); drop.classList.add("over"); }));
+["dragleave", "drop"].forEach(e => drop.addEventListener(e, ev => { ev.preventDefault(); drop.classList.remove("over"); }));
+drop.addEventListener("drop", ev => { const f = ev.dataTransfer.files[0]; if (f) start(f); });
+
+function setStep(step, message) {
+  const idx = STEPS.indexOf(step);
+  document.querySelectorAll(".step").forEach(el => {
+    const i = STEPS.indexOf(el.dataset.step);
+    el.className = "step" + (i < idx ? " done" : i === idx ? " active" : "");
+  });
+  if (message) $("msg").textContent = message;
+}
+
+function fmt(t, srt = false) {
+  const h = Math.floor(t / 3600), m = Math.floor(t % 3600 / 60), s = Math.floor(t % 60);
+  const ms = Math.round((t % 1) * 1000);
+  const p = (n, w = 2) => String(n).padStart(w, "0");
+  if (srt) return `${p(h)}:${p(m)}:${p(s)},${p(ms, 3)}`;
+  return (h ? `${h}:${p(m)}` : `${m}`) + `:${p(s)}`;
+}
+
+async function start(file) {
+  fileName = file.name.replace(/\.[^.]+$/, "") || "video";
+  $("error").style.display = "none";
+  $("result").style.display = "none";
+  $("status").classList.add("show");
+  drop.style.pointerEvents = "none"; drop.style.opacity = .5;
+  setStep("upload", "파일 업로드 중…");
+
+  if (videoUrl) URL.revokeObjectURL(videoUrl);
+  videoUrl = URL.createObjectURL(file);
+
+  const form = new FormData();
+  form.append("file", file);
+  try {
+    const res = await fetch("/api/translate", { method: "POST", body: form });
+    if (!res.ok) throw new Error(`서버 오류 (${res.status})`);
+    const reader = res.body.getReader(), dec = new TextDecoder();
+    let buf = "", got = false;
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      let nl;
+      while ((nl = buf.indexOf("\n")) >= 0) {
+        const line = buf.slice(0, nl).trim(); buf = buf.slice(nl + 1);
+        if (!line) continue;
+        const ev = JSON.parse(line);
+        if (ev.type === "progress") setStep(ev.step, ev.message);
+        else if (ev.type === "error") throw new Error(ev.message);
+        else if (ev.type === "result") { got = true; showResult(ev); }
+      }
+    }
+    if (!got) throw new Error("서버 응답이 중간에 끊겼습니다.");
+  } catch (e) {
+    $("error").textContent = "⚠ " + e.message;
+    $("error").style.display = "block";
+  } finally {
+    $("status").classList.remove("show");
+    drop.style.pointerEvents = ""; drop.style.opacity = "";
+    fileInput.value = "";
+  }
+}
+
+function visible() {
+  return $("showAll").checked ? segments : segments.filter(s => s.is_dialogue && s.ko);
+}
+
+function showResult(ev) {
+  segments = ev.segments;
+  const n = segments.filter(s => s.is_dialogue && s.ko).length;
+  $("info").textContent = `감지된 언어: ${ev.language || "?"} · 대사 ${n}줄`;
+  video.src = videoUrl;
+  buildTrack();
+  render();
+  $("result").style.display = "block";
+}
+
+function buildTrack() {
+  video.querySelectorAll("track").forEach(t => t.remove());
+  const vtt = "WEBVTT\n\n" + segments.filter(s => s.is_dialogue && s.ko).map(s =>
+    `${fmt(s.start, true).replace(",", ".")} --> ${fmt(s.end, true).replace(",", ".")}\n${s.ko}`).join("\n\n");
+  const track = document.createElement("track");
+  Object.assign(track, { kind: "subtitles", label: "한국어", srclang: "ko", default: true,
+    src: URL.createObjectURL(new Blob([vtt], { type: "text/vtt" })) });
+  video.appendChild(track);
+  track.track.mode = "showing";
+}
+
+function render() {
+  const ol = $("lines"), showOrig = $("showOrig").checked;
+  ol.innerHTML = "";
+  const list = visible();
+  if (!list.length) { ol.innerHTML = '<li class="empty" style="display:block">인식된 대사가 없습니다.</li>'; return; }
+  for (const s of list) {
+    const li = document.createElement("li");
+    li.dataset.start = s.start; li.dataset.end = s.end;
+    if (!s.is_dialogue) li.classList.add("nondialogue");
+    li.innerHTML = `<span class="ts"></span><div><div class="ko"></div>${showOrig ? '<div class="orig"></div>' : ""}</div>`;
+    li.querySelector(".ts").textContent = fmt(s.start);
+    li.querySelector(".ko").textContent = s.ko || "—";
+    if (showOrig) li.querySelector(".orig").textContent = s.text;
+    li.addEventListener("click", () => { video.currentTime = s.start; video.play(); });
+    ol.appendChild(li);
+  }
+}
+
+video.addEventListener("timeupdate", () => {
+  const t = video.currentTime;
+  document.querySelectorAll("#lines li[data-start]").forEach(li =>
+    li.classList.toggle("current", t >= +li.dataset.start && t < +li.dataset.end));
+});
+$("showAll").addEventListener("change", render);
+$("showOrig").addEventListener("change", render);
+
+$("dlSrt").addEventListener("click", () => {
+  const srt = segments.filter(s => s.is_dialogue && s.ko).map((s, i) =>
+    `${i + 1}\n${fmt(s.start, true)} --> ${fmt(s.end, true)}\n${s.ko}\n`).join("\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([srt], { type: "application/x-subrip" }));
+  a.download = `${fileName}.ko.srt`;
+  a.click();
+});
+$("dlTxt").addEventListener("click", async () => {
+  const txt = visible().map(s => `[${fmt(s.start)}] ${s.ko}`).join("\n");
+  await navigator.clipboard.writeText(txt);
+  $("dlTxt").textContent = "복사됨!";
+  setTimeout(() => $("dlTxt").textContent = "텍스트 복사", 1500);
+});
+</script>
+</body>
+</html>
