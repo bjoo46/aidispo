@@ -15,7 +15,7 @@ from fastapi import FastAPI, File, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 
 WHISPER_MODEL = os.environ.get("WHISPER_MODEL", "small")
-CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL", "claude-opus-5-5")
+CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL", "claude-haiku-4-5")
 BATCH_SIZE = 80  # 한 번의 LLM 호출로 번역할 세그먼트 수
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -89,12 +89,10 @@ def transcribe(audio_path: str):
 
 
 def translate_batch(batch, source_lang: str) -> dict:
-    response = client.beta.messages.create(
+    response = client.messages.create(
         model=CLAUDE_MODEL,
         max_tokens=16000,
-        betas=["server-side-fallback-2026-07-01"],
-        fallbacks="default",
-        output_config={"effort": "medium", "format": {"type": "json_schema", "schema": TRANSLATION_SCHEMA}},
+        output_config={"format": {"type": "json_schema", "schema": TRANSLATION_SCHEMA}},
         system=SYSTEM_PROMPT,
         messages=[{
             "role": "user",

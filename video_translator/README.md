@@ -25,7 +25,7 @@ uvicorn app:app --host 0.0.0.0 --port 8000
 | 변수 | 기본값 | 설명 |
 |---|---|---|
 | `ANTHROPIC_API_KEY` | (필수) | Claude API 키 |
-| `CLAUDE_MODEL` | `claude-opus-5-5` | 번역에 쓸 모델 |
+| `CLAUDE_MODEL` | `claude-haiku-4-5` | 번역에 쓸 모델. 가장 저렴한 모델이 기본값이고, 번역 품질을 높이려면 `claude-sonnet-5-5`로 바꾸세요 |
 | `WHISPER_MODEL` | `small` | `tiny`/`base`/`small`/`medium`/`large-v3`. 클수록 정확하지만 느림 |
 
 Whisper 모델은 처음 실행할 때 Hugging Face에서 자동으로 내려받습니다. GPU가 있으면 자동으로 사용합니다.
